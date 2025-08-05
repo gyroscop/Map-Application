@@ -11,14 +11,53 @@ const inputDuration = document.querySelector('.form__input--duration');
 const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
-let map, mapE;
+class Workout {
+  date = new Date();
+  id = (Date.now() + '').slice(-10);
+  constructor(coords, distance, duration) {
+    this.coords = coords;
+    this.distance = distance;
+    this.duration = duration;
+  }
+}
 
+class Running extends Workout {
+  constructor(coords, distance, duration, cadence) {
+    super(coords, distance, duration);
+    this.cadence = cadence;
+    this.calcPace();
+  }
+
+  // min/km
+  calcPace() {
+    this.pace = this.duration / this.distance;
+    return this.pace;
+  }
+}
+
+class Cycling extends Workout {
+  constructor(coords, distance, duration, elevationGain) {
+    super(coords, distance, duration);
+    this.elevationGain = elevationGain;
+  }
+
+  //km/h
+  calcSpeed() {
+    this.speed = this.distance / (this.duration / 60);
+    return this.speed;
+  }
+}
+
+//Application Architecture
 class App {
   #map;
   #mapE;
+  #workouts = [];
+  workout;
+  mark;
   constructor() {
     this._getPosition();
-    inputType.addEventListener('change', this._toggleElevationField.bind(this));
+    inputType.addEventListener('change', this._toggleElevationField);
 
     form.addEventListener('submit', this._newWorkout.bind(this));
   }
@@ -51,19 +90,8 @@ class App {
     const { lat, lng } = this.#mapE.latlng;
 
     // L.marker([lat, lng]).addTo(map).bindPopup('test').openPopup();
-    L.marker([lat, lng])
-      .addTo(this.#map)
-      .bindPopup(
-        L.popup({
-          maxWidth: 250,
-          minWidth: 100,
-          autoClose: false,
-          closeOnClick: false,
-          className: 'running-popup',
-        })
-      )
-      .setPopupContent('Workout')
-      .openPopup();
+
+    this._renderWorkoutMarker([lat, lng]);
 
     form.classList.remove('hidden');
     inputDistance.focus();
@@ -75,12 +103,90 @@ class App {
   _newWorkout(e) {
     e.preventDefault();
 
+    //get Data from form
+    const type = inputType.value;
+    const distance = Number(inputDistance.value);
+    const duration = Number(inputDuration.value);
+    const { lat, lng } = this.#mapE.latlng;
+    // let workout;
+
+    const validInputs = (...inputs) => {
+      return inputs.every(inp => Number.isFinite(inp));
+    };
+
+    const allPositive = (...inputs) => {
+      return inputs.every(inp => inp > 0);
+    };
+
+    if (type === 'running') {
+      const cadence = Number(inputCadence.value);
+
+      if (
+        !validInputs(distance, duration, cadence) ||
+        !allPositive(distance, duration, cadence)
+      ) {
+        alert('Inputs should be positive numbers');
+        return;
+      }
+
+      this.workout = new Running([lat, lng], distance, duration, cadence);
+    }
+
+    if (type === 'cycling') {
+      const elevation = Number(inputElevation.value);
+      if (
+        !validInputs(distance, duration, elevation) ||
+        !allPositive(distance, duration)
+      ) {
+        alert('Inputs should be positive numbers');
+        return;
+      }
+      this.workout = new Cycling([lat, lng], distance, duration, elevation);
+    }
+
+    this.#workouts.push(this.workout);
+
+    console.log(this.#workouts);
+
+    this.mark
+      .bindPopup(
+        L.popup({
+          maxWidth: 250,
+          minWidth: 100,
+          autoClose: false,
+          closeOnClick: false,
+          className: `${type}-popup`,
+        })
+      )
+      .setPopupContent(`${type}`)
+      .openPopup();
+
     inputDistance.value =
       inputDuration.value =
       inputCadence.value =
       inputElevation.value =
         '';
   }
+
+  _renderWorkoutMarker([lat, lng]) {
+    this.mark = L.marker([lat, lng]).addTo(this.#map);
+    /*.bindPopup(
+        L.popup({
+          maxWidth: 250,
+          minWidth: 100,
+          autoClose: false,
+          closeOnClick: false,
+          className: `cycling-popup`,
+        })
+      )
+      .setPopupContent(`workout`)
+      .openPopup()
+      */
+  }
 }
 
 const firstMap = new App();
+// const run1 = new Running([22.2855168, 114.1669888], 5, 30, 150);
+// const cycle1 = new Cycling([22.2855168, 114.1669888], 5, 30, 10);
+// console.log(run1);
+// console.log(cycle1);
